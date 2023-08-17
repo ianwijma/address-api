@@ -33,17 +33,13 @@ class ExtractCommand extends Command
             throw new FileNotFoundException("File $file was not found.");
         }
 
+        $output->writeln('Extracting archive, this can take a while...');
         $targetDir = $this->getTempDir();
-        $targetDir = '/tmp/address_XXL1L6';
-
         $archive = new ZipArchive();
         $archive->open($file, ZipArchive::RDONLY);
-
-        $output->writeln('Extracting archive, this can take a while...');
-//        $archive->extractTo($targetDir);
+        $archive->extractTo($targetDir);
 
         $output->writeln("Extracting done, creating per-country geojson files.");
-
         $finder = new Finder();
         $finder
             ->files()

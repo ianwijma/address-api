@@ -2,14 +2,21 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
 use App\Repository\CoordinateRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Types\UlidType;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Uid\Ulid;
 
-#[ORM\Entity(repositoryClass: CoordinateRepository::class)]
+#[ORM\Entity(repositoryClass: CoordinateRepository::class, readOnly: true)]
 #[UniqueEntity(['north', 'east'])]
+#[ApiResource(operations: [
+    new Get(),
+    new GetCollection()
+])]
 class Coordinate
 {
     #[ORM\Id]

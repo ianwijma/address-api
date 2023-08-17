@@ -2,13 +2,22 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
 use App\Repository\AddressRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Types\UlidType;
-use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Uid\Ulid;
 
-#[ORM\Entity(repositoryClass: AddressRepository::class)]
+#[ORM\Entity(repositoryClass: AddressRepository::class, readOnly: true)]
+#[ApiResource(
+    operations: [
+        new Get(),
+        new GetCollection()
+    ]
+)]
 class Address
 {
     #[ORM\Id]
@@ -42,8 +51,7 @@ class Address
     private ?string $external_id = null;
 
     #[ORM\ManyToOne(targetEntity: Coordinate::class)]
-    #[ORM\JoinColumn(name: 'coordinate_id', referencedColumnName: 'id')]
-
+    #[ORM\JoinColumn(name: 'coordinate_id', referencedColumnName: 'id', nullable: true)]
     private ?Coordinate $coordinate = null;
 
     public function getId(): ?Ulid

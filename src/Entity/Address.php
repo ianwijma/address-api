@@ -11,14 +11,6 @@ use Symfony\Bridge\Doctrine\Types\UlidType;
 use Symfony\Component\Uid\Ulid;
 
 #[ORM\Entity(repositoryClass: AddressRepository::class, readOnly: true)]
-#[ORM\UniqueConstraint(
-    name: 'unique_address',
-    columns: ['country','region', 'district', 'postcode', 'street', 'number', 'unit']
-)]
-#[ORM\UniqueConstraint(
-    name: 'unique_hash',
-    columns: ['hash']
-)]
 #[ApiResource(
     operations: [
         new Get(),
@@ -35,6 +27,9 @@ class Address
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $country = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $city = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $region = null;
@@ -77,6 +72,18 @@ class Address
     public function setCountry(?string $country): Address
     {
         $this->country = $country;
+
+        return $this;
+    }
+
+    public function getCity(): ?string
+    {
+        return $this->city;
+    }
+
+    public function setCity(?string $city): Address
+    {
+        $this->city = $city;
 
         return $this;
     }

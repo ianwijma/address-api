@@ -27,10 +27,10 @@ class Coordinate
     #[ORM\CustomIdGenerator(class: 'doctrine.ulid_generator')]
     private ?Ulid $id = null;
 
-    #[ORM\Column(type: 'decimal', precision: 7)]
+    #[ORM\Column]
     private ?string $north = null;
 
-    #[ORM\Column(type: 'decimal', precision: 7)]
+    #[ORM\Column]
     private ?string $east = null;
 
     public function getId(): ?Ulid

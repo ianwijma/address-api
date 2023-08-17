@@ -8,10 +8,17 @@ use ApiPlatform\Metadata\GetCollection;
 use App\Repository\AddressRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Types\UlidType;
-use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Uid\Ulid;
 
 #[ORM\Entity(repositoryClass: AddressRepository::class, readOnly: true)]
+#[ORM\UniqueConstraint(
+    name: 'unique_address',
+    columns: ['country','region', 'district', 'postcode', 'street', 'number', 'unit']
+)]
+#[ORM\UniqueConstraint(
+    name: 'unique_hash',
+    columns: ['hash']
+)]
 #[ApiResource(
     operations: [
         new Get(),
@@ -27,22 +34,25 @@ class Address
     private ?Ulid $id = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    private ?string $number = null;
-
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $street = null;
-
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $unit = null;
-
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $district = null;
+    private ?string $country = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $region = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    private ?string $district = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $postcode = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $street = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $number = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $unit = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $hash = null;
@@ -59,50 +69,14 @@ class Address
         return $this->id;
     }
 
-    public function getNumber(): ?string
+    public function getCountry(): ?string
     {
-        return $this->number;
+        return $this->country;
     }
 
-    public function setNumber(?string $number): static
+    public function setCountry(?string $country): Address
     {
-        $this->number = $number;
-
-        return $this;
-    }
-
-    public function getStreet(): ?string
-    {
-        return $this->street;
-    }
-
-    public function setStreet(?string $street): static
-    {
-        $this->street = $street;
-
-        return $this;
-    }
-
-    public function getUnit(): ?string
-    {
-        return $this->unit;
-    }
-
-    public function setUnit(string $unit): static
-    {
-        $this->unit = $unit;
-
-        return $this;
-    }
-
-    public function getDistrict(): ?string
-    {
-        return $this->district;
-    }
-
-    public function setDistrict(?string $district): static
-    {
-        $this->district = $district;
+        $this->country = $country;
 
         return $this;
     }
@@ -112,9 +86,21 @@ class Address
         return $this->region;
     }
 
-    public function setRegion(?string $region): static
+    public function setRegion(?string $region): Address
     {
         $this->region = $region;
+
+        return $this;
+    }
+
+    public function getDistrict(): ?string
+    {
+        return $this->district;
+    }
+
+    public function setDistrict(?string $district): Address
+    {
+        $this->district = $district;
 
         return $this;
     }
@@ -124,9 +110,45 @@ class Address
         return $this->postcode;
     }
 
-    public function setPostcode(string $postcode): static
+    public function setPostcode(?string $postcode): Address
     {
         $this->postcode = $postcode;
+
+        return $this;
+    }
+
+    public function getStreet(): ?string
+    {
+        return $this->street;
+    }
+
+    public function setStreet(?string $street): Address
+    {
+        $this->street = $street;
+
+        return $this;
+    }
+
+    public function getNumber(): ?string
+    {
+        return $this->number;
+    }
+
+    public function setNumber(?string $number): Address
+    {
+        $this->number = $number;
+
+        return $this;
+    }
+
+    public function getUnit(): ?string
+    {
+        return $this->unit;
+    }
+
+    public function setUnit(?string $unit): Address
+    {
+        $this->unit = $unit;
 
         return $this;
     }
@@ -136,7 +158,7 @@ class Address
         return $this->hash;
     }
 
-    public function setHash(string $hash): static
+    public function setHash(?string $hash): Address
     {
         $this->hash = $hash;
 
@@ -148,7 +170,7 @@ class Address
         return $this->external_id;
     }
 
-    public function setExternalId(?string $external_id): static
+    public function setExternalId(?string $external_id): Address
     {
         $this->external_id = $external_id;
 

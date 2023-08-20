@@ -55,6 +55,10 @@ class Address
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $external_id = null;
 
+    #[ORM\ManyToOne(targetEntity: Version::class)]
+    #[ORM\JoinColumn(name: 'version_id', referencedColumnName: 'id', nullable: true)]
+    private ?Version $version = null;
+
     #[ORM\ManyToOne(targetEntity: Coordinate::class)]
     #[ORM\JoinColumn(name: 'coordinate_id', referencedColumnName: 'id', nullable: true)]
     private ?Coordinate $coordinate = null;
@@ -180,6 +184,18 @@ class Address
     public function setExternalId(?string $external_id): Address
     {
         $this->external_id = $external_id;
+
+        return $this;
+    }
+
+    public function getVersion(): ?Version
+    {
+        return $this->version;
+    }
+
+    public function setVersion(?Version $version): Address
+    {
+        $this->version = $version;
 
         return $this;
     }

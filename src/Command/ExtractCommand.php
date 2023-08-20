@@ -13,8 +13,7 @@ use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
 use ZipArchive;
 
-#[AsCommand(name: 'address:extract',description: 'Imports addresses and coordinates')]
-class ExtractCommand extends Command
+class ExtractCommand
 {
     public const INPUT_PATH = __DIR__ . '/../../input';
 

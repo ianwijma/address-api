@@ -4,9 +4,11 @@ namespace App\Command;
 
 use App\Entity\Address;
 use App\Entity\Coordinate;
-use App\Repository\AddressRepository;
-use App\Repository\CoordinateRepository;
+use App\Exceptions\VersionMissMatchException;
+use App\Service\AddressVersionService;
+use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManagerInterface;
+use phpDocumentor\Reflection\Types\This;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -16,26 +18,52 @@ use Symfony\Component\Filesystem\Exception\FileNotFoundException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
-#[AsCommand(name: 'address:import',description: 'Imports addresses and coordinates')]
-class ImportCommand extends Command
+class ImportCommandOld
 {
     public const INPUT_PATH = __DIR__ . '/../../input';
+    public const BATCH_SIZE = 100;
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly AddressVersionService $addressVersionService,
     ) {
-        parent::__construct();
     }
 
-    protected function configure()
+    /**
+     * @return int
+     * @throws Exception
+     * @throws VersionMissMatchException
+     */
+    public function getNextVersion(): int
+    {
+        $currentVersion = $this->addressVersionService->getVersion();
+
+        return $currentVersion + 1;
+    }
+
+    protected function configure(): void
     {
         $this
             ->addArgument('country', InputArgument::REQUIRED);
     }
 
+    /**
+     * @throws VersionMissMatchException
+     * @throws Exception
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $country = $input->getArgument('country');
+
+        $version = $this->getNextVersion();
+        $validatedFilePath = $this->getValidatedFilePath(country: $country);
+        $this->importFile(version: $version, country: $country, filePath: $validatedFilePath, output: $output);
+
+        return Command::SUCCESS;
+    }
+
+    private function getValidatedFilePath(string $country): string
+    {
         $path = Path::canonicalize(self::INPUT_PATH . "/$country.geojson");
 
         $filesystem = new Filesystem();
@@ -43,30 +71,39 @@ class ImportCommand extends Command
             throw new FileNotFoundException("File not found: $path");
         }
 
-        // TODO: Not use a map
-        $map = [];
+        return $path;
+    }
 
-        $contents = \file($path);
-
-        $output->writeln("Counting addresses...");
+    private function importFile(int $version, string $country, string $filePath, OutputInterface $output): void
+    {
+        $contents = \file($filePath);
         $total = count($contents);
-        $output->writeln("$total addresses found");
+        $output->writeln("$total addresses to be imported");
 
+        $this->entityManager->getConfiguration()->setMiddlewares([]);
+
+        $coordinateRepository = $this->entityManager->getRepository(Coordinate::class);
+
+        $coordinateIdMap = [];
         foreach ($contents as $index => $line) {
             $data = json_decode($line);
             $addressProps = $data->properties;
             [$east, $north] = $data->geometry->coordinates;
 
-            if (!array_key_exists("$north::$east", $map)) {
-                $coordinate = $map["$north::$east"] = (new Coordinate())
+            $coordinateIdMapKey = "$north::$east";
+            if (!array_key_exists($coordinateIdMapKey, $coordinateIdMap)) {
+                $coordinate = (new Coordinate())
                     ->setNorth($north)
-                    ->setEast($east);
+                    ->setEast($east)
+                    ->setVersion($version);
 
                 $this->entityManager->persist($coordinate);
-            } else {
-                $coordinate = $map["$north::$east"];
-            }
 
+                $coordinateIdMap[$coordinateIdMapKey] = $coordinate->getId();
+            } else {
+                $coordinateId = $coordinateIdMap[$coordinateIdMapKey];
+                $coordinate = $coordinateRepository->find($coordinateId);
+            }
 
             $address = (new Address())
                 ->setCountry($country)
@@ -79,17 +116,21 @@ class ImportCommand extends Command
                 ->setUnit($addressProps->unit)
                 ->setHash($addressProps->hash)
                 ->setExternalId($addressProps->id)
+                ->setVersion($version)
                 ->setCoordinate($coordinate);
 
 
             $this->entityManager->persist($address);
 
-            if ($index % 10000 === 0) {
+            if ($index % self::BATCH_SIZE === 0) {
                 $output->writeln("[$index/$total] Flushing...");
                 $this->entityManager->flush();
+                $this->entityManager->clear();
             }
         }
 
-        return Command::SUCCESS;
+        // Clean up the remaining items
+        $this->entityManager->flush();
+        $this->entityManager->clear();
     }
 }

@@ -13,7 +13,7 @@ use Symfony\Component\Uid\Ulid;
 #[ORM\Entity(repositoryClass: CoordinateRepository::class, readOnly: true)]
 #[ORM\UniqueConstraint(
     name: 'unique_coordinate',
-    columns: ['north', 'east']
+    columns: ['north', 'east', 'version_id']
 )]
 #[ApiResource(operations: [
     new Get(),
@@ -21,6 +21,11 @@ use Symfony\Component\Uid\Ulid;
 ])]
 class Coordinate
 {
+    public function __construct(Ulid $id = null)
+    {
+        $this->id = $id;
+    }
+
     #[ORM\Id]
     #[ORM\Column(type: UlidType::NAME, unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -32,6 +37,10 @@ class Coordinate
 
     #[ORM\Column]
     private ?string $east = null;
+
+    #[ORM\ManyToOne(targetEntity: Version::class)]
+    #[ORM\JoinColumn(name: 'version_id', referencedColumnName: 'id', nullable: true)]
+    private ?Version $version = null;
 
     public function getId(): ?Ulid
     {
@@ -58,6 +67,18 @@ class Coordinate
     public function setEast(string $east): static
     {
         $this->east = $east;
+
+        return $this;
+    }
+
+    public function getVersion(): ?Version
+    {
+        return $this->version;
+    }
+
+    public function setVersion(?Version $version): Coordinate
+    {
+        $this->version = $version;
 
         return $this;
     }

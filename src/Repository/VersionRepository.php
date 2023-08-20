@@ -23,6 +23,11 @@ class VersionRepository extends ServiceEntityRepository
         parent::__construct($registry, Version::class);
     }
 
+    public function getByVersionNumber(int $versionNumber): ?Version
+    {
+        return $this->findOneBy(['versionNumber' => $versionNumber]);
+    }
+
     public function createNewVersion(): Version
     {
         $nextVersionNumber = $this->getNextVersionNumber();
@@ -64,6 +69,23 @@ class VersionRepository extends ServiceEntityRepository
         return null;
     }
 
+    public function findByVersionNumberOrThrow(int $versionNumber): Version
+    {
+        if ($version = $this->getByVersionNumber($versionNumber)) {
+            return $version;
+        }
+
+        throw new EntityNotFoundException(sprintf(
+            'Version %s not found',
+            $versionNumber
+        ));
+    }
+
+    public function findByVersionNumber(int $versionNumber): Version
+    {
+        return $this->findOneBy(['versionNumber' => $versionNumber]);
+    }
+
     /**
      * @throws EntityNotFoundException
      */
@@ -71,13 +93,7 @@ class VersionRepository extends ServiceEntityRepository
     {
         $entityManager = $this->getEntityManager();
 
-        $targetVersion = $this->findOneBy(['versionNumber' => $version]);
-        if (!$targetVersion) {
-            throw new EntityNotFoundException(sprintf(
-                'Version %s not found',
-                $version
-            ));
-        }
+        $targetVersion = $this->findByVersionNumberOrThrow($version);
 
         $activeVersions = $this->findBy(['active' => true]);
         foreach ($activeVersions as $activeVersion) {

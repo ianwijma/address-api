@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use App\Repository\AddressRepository;
+use App\Repository\CoordinateRepository;
 use App\Repository\VersionRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Types\UlidType;
@@ -10,7 +12,7 @@ use Symfony\Component\Uid\Ulid;
 #[ORM\Entity(repositoryClass: VersionRepository::class)]
 #[ORM\UniqueConstraint(
     name: 'unique_version',
-    columns: ['number']
+    columns: ['version_number']
 )]
 class Version
 {
@@ -21,7 +23,7 @@ class Version
     private ?Ulid $id = null;
 
     #[ORM\Column]
-    private ?int $number = null;
+    private ?int $versionNumber = null;
 
     #[ORM\Column]
     private ?bool $active = false;
@@ -31,14 +33,14 @@ class Version
         return $this->id;
     }
 
-    public function getNumber(): ?string
+    public function getVersionNumber(): ?int
     {
-        return $this->number;
+        return $this->versionNumber;
     }
 
-    public function setNumber(string $number): static
+    public function setVersionNumber(int $versionNumber): static
     {
-        $this->number = $number;
+        $this->versionNumber = $versionNumber;
 
         return $this;
     }

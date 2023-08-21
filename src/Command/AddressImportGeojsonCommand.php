@@ -2,12 +2,9 @@
 
 namespace App\Command;
 
-use App\Entity\Address;
-use App\Entity\Coordinate;
 use App\Repository\AddressRepository;
-use App\Repository\CoordinateRepository;
 use App\Repository\VersionRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityNotFoundException;
 use Exception;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -18,6 +15,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Exception\FileNotFoundException;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Component\Uid\Ulid;
 
 #[AsCommand(name: 'address:import:file', description: 'Imports addresses using a file as input')]
 class AddressImportGeojsonCommand extends Command
@@ -27,8 +25,7 @@ class AddressImportGeojsonCommand extends Command
     public function __construct(
         private readonly VersionRepository $versionRepository,
         private readonly AddressRepository $addressRepository,
-        private readonly CoordinateRepository $coordinateRepository,
-        private readonly EntityManagerInterface $entityManager,
+        private readonly Connection $connection
     ) {
         parent::__construct();
     }
@@ -43,6 +40,7 @@ class AddressImportGeojsonCommand extends Command
 
     /**
      * @throws EntityNotFoundException
+     * @throws \Doctrine\DBAL\Exception
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -54,6 +52,7 @@ class AddressImportGeojsonCommand extends Command
         }
 
         $version = $this->versionRepository->findByVersionNumberOrThrow($versionNumber);
+
         $inputFilePath = Path::makeAbsolute(Path::canonicalize($inputFile), getcwd());
         if (!file_exists($inputFilePath)) {
             throw new FileNotFoundException(sprintf(
@@ -76,57 +75,74 @@ class AddressImportGeojsonCommand extends Command
         $total = count($contents);
         $output->writeln("$total addresses to be imported");
 
-        $this->entityManager->getConfiguration()->setMiddlewares([]);
-
-        $coordinateIdMap = [];
+        $this->connection->getConfiguration()->setMiddlewares([]);
+        $this->connection->beginTransaction();
         foreach ($contents as $index => $line) {
             $data = json_decode($line);
             $addressProps = $data->properties;
             [$east, $north] = $data->geometry->coordinates;
 
-            $coordinateIdMapKey = "$north::$east";
-            if (!array_key_exists($coordinateIdMapKey, $coordinateIdMap)) {
-                $coordinate = (new Coordinate())
-                    ->setNorth($north)
-                    ->setEast($east)
-                    ->setVersion($version);
+            $coordinateStatement = $this->connection->prepare('
+INSERT INTO coordinate(id, north, east, version_id)
+VALUES (?, ?, ?, ?)
+ON CONFLICT DO NOTHING
+RETURNING id;
+');
 
-                $this->entityManager->persist($coordinate);
+            $coordinateResult = $coordinateStatement->executeQuery([
+                (new Ulid())->toRfc4122(),
+                $north,
+                $east,
+                $version->getId()->toRfc4122()
+            ]);
 
-                $coordinateIdMap[$coordinateIdMapKey] = $coordinate->getId();
+            if ($coordinateResult->rowCount() > 0) {
+                [$coordinateId] = $coordinateResult->fetchFirstColumn();
             } else {
-                $coordinateId = $coordinateIdMap[$coordinateIdMapKey];
-                $coordinate = $this->coordinateRepository->find($coordinateId);
+                // Fallback
+                $coordinateStatement = $this->connection->prepare('SELECT id FROM coordinate WHERE north=? AND east=? AND version_id=?');
+                $coordinateResults = $coordinateStatement->executeQuery([
+                    $north,
+                    $east,
+                    $version->getId()->toRfc4122()
+                ]);
+
+                [$coordinateId] = $coordinateResults->fetchFirstColumn();
             }
 
-            $address = (new Address())
-                ->setCountry($country)
-                ->setCity($addressProps->city)
-                ->setRegion($addressProps->region)
-                ->setDistrict($addressProps->district)
-                ->setPostcode($addressProps->postcode)
-                ->setStreet($addressProps->street)
-                ->setNumber($addressProps->number)
-                ->setUnit($addressProps->unit)
-                ->setHash($addressProps->hash)
-                ->setExternalId($addressProps->id)
-                ->setVersion($version)
-                ->setCoordinate($coordinate);
+            $addressStatement = $this->connection->prepare('
+INSERT INTO address(id, coordinate_id, number, street, unit, district, region, postcode, hash, external_id, country, city, version_id) 
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+RETURNING id;
+');
 
-
-            $this->entityManager->persist($address);
+            $addressStatement->executeStatement([
+                (new Ulid())->toRfc4122(),
+                $coordinateId,
+                $addressProps->number,
+                $addressProps->street,
+                $addressProps->unit,
+                $addressProps->district,
+                $addressProps->region,
+                $addressProps->postcode,
+                $addressProps->hash,
+                $addressProps->id,
+                $country,
+                $addressProps->city,
+                $version->getId()->toRfc4122()
+            ]);
 
             if ($index % self::BATCH_SIZE === 0) {
                 $output->writeln("[$index/$total] Flushing...");
-                $this->entityManager->flush();
-                $this->entityManager->clear();
-                $version = $this->versionRepository->findByVersionNumberOrThrow($versionNumber);
+                $this->connection->commit();
+                $this->connection->beginTransaction();
             }
+
+            unset($data, $addressProps, $north, $east, $coordinateResult, $addressStatement);
         }
 
         // Clean up the remaining items
-        $this->entityManager->flush();
-        $this->entityManager->clear();
+        $this->connection->commit();
 
         return self::SUCCESS;
     }

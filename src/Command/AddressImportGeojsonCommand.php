@@ -2,19 +2,16 @@
 
 namespace App\Command;
 
-use App\Repository\AddressRepository;
 use App\Repository\VersionRepository;
 use App\Service\FileSystemService;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityNotFoundException;
-use Exception;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Filesystem\Exception\FileNotFoundException;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Uid\Ulid;
 
@@ -25,7 +22,6 @@ class AddressImportGeojsonCommand extends Command
 
     public function __construct(
         private readonly VersionRepository $versionRepository,
-        private readonly AddressRepository $addressRepository,
         private readonly Connection $connection,
         private readonly FileSystemService $fileSystemService,
     ) {
@@ -42,7 +38,7 @@ class AddressImportGeojsonCommand extends Command
 
     /**
      * @throws EntityNotFoundException
-     * @throws \Doctrine\DBAL\Exception
+     * @throws Exception
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -55,15 +51,6 @@ class AddressImportGeojsonCommand extends Command
         $filePath = $this->fileSystemService->getAbsoluteFilePath($inputFile);
         $this->fileSystemService->fileExistsOrThrow($filePath);
         $filePath = Path::makeAbsolute(Path::canonicalize($inputFile), getcwd());
-
-        $address = $this->addressRepository->findOneBy(['country' => $country, 'version' => $version]);
-        if ($address) {
-            throw new Exception(sprintf(
-                'Addresses for this country \'%s\' & version \'%s\' are already imported',
-                $country,
-                $version->getVersionNumber()
-            ));
-        }
 
         $contents = file($filePath);
         $total = count($contents);

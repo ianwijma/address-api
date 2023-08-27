@@ -12,7 +12,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Exception\FileNotFoundException;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\String\Slugger\AsciiSlugger;
 use ZipArchive;
+use function Symfony\Component\String\u;
 
 #[AsCommand(name: 'address:prepare:global-collection', description: 'Prepare the OpenAddresses.io, global-collection.zip into importable files')]
 class AddressPrepareGlobalCommand extends Command
@@ -77,7 +79,7 @@ class AddressPrepareGlobalCommand extends Command
         $inputFile = $input->getArgument('input-file');
         $directory = $input->getArgument('output-directory');
         $splitTarget = $input->getArgument('split-target');
-        $country = $input->getArgument('country');
+        $country = u($input->getArgument('country'))->lower();
 
         $inputFilePath = Path::makeAbsolute(Path::canonicalize($inputFile), getcwd());
         $directoryPath = Path::makeAbsolute(Path::canonicalize($directory), getcwd());
@@ -124,6 +126,8 @@ class AddressPrepareGlobalCommand extends Command
             ->in($temporaryDirectoryPath)
             ->name('*addresses*.geojson');
 
+        $slugger = new AsciiSlugger($country);
+
         foreach ($finder as $inputFile) {
             if ($splitTarget) {
                 $content = explode("\n", $inputFile->getContents());
@@ -131,7 +135,7 @@ class AddressPrepareGlobalCommand extends Command
                     $data = json_decode($line);
                     if ($data) {
                         $addressProps = $data->properties;
-                        $splitValue = $addressProps->$splitTarget;
+                        $splitValue = $slugger->slug(u($addressProps->$splitTarget)->lower());
 
                         $outputFile = sprintf("%s-%s.geojson", $country, $splitValue);
                         $outputFilePath = $directoryPath . '/' . $outputFile;

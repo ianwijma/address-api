@@ -14,6 +14,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Uid\Ulid;
+use function Symfony\Component\String\u;
 
 #[AsCommand(name: 'address:import:file', description: 'Imports addresses using a file as input')]
 class AddressImportGeojsonCommand extends Command
@@ -101,16 +102,16 @@ RETURNING id;
             $addressStatement->executeStatement([
                 (new Ulid())->toRfc4122(),
                 $coordinateId,
-                $addressProps->number,
-                $addressProps->street,
-                $addressProps->unit,
-                $addressProps->district,
-                $addressProps->region,
-                $addressProps->postcode,
-                $addressProps->hash,
+                $this->format($addressProps->number),
+                $this->format($addressProps->street),
+                $this->format($addressProps->unit),
+                $this->format($addressProps->district),
+                $this->format($addressProps->region),
+                $this->format($addressProps->postcode),
+                $this->format($addressProps->hash),
                 $addressProps->id,
                 $country,
-                $addressProps->city,
+                $this->format($addressProps->city),
                 $version->getId()->toRfc4122()
             ]);
 
@@ -127,5 +128,10 @@ RETURNING id;
         $this->connection->commit();
 
         return self::SUCCESS;
+    }
+
+    private function format(string $input): string
+    {
+        return u($input)->lower()->title(true);
     }
 }

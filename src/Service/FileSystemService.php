@@ -5,6 +5,8 @@ namespace App\Service;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Symfony\Component\Filesystem\Exception\FileNotFoundException;
+use Symfony\Component\Filesystem\Path;
 
 class FileSystemService
 {
@@ -32,5 +34,21 @@ class FileSystemService
         }
 
         rmdir($directoryPath);
+    }
+
+    public function getAbsoluteFilePath(string $filePath, string $startPath = null): string
+    {
+        $startPath ??= getcwd();
+        return Path::makeAbsolute(Path::canonicalize($filePath), $startPath);
+    }
+
+    public function fileExistsOrThrow(string $absoluteFilePath): void
+    {
+        if (!$absoluteFilePath) {
+            throw new FileNotFoundException(sprintf(
+                'File not found: %s',
+                $absoluteFilePath
+            ));
+        }
     }
 }

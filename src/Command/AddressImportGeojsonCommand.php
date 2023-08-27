@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Repository\AddressRepository;
 use App\Repository\VersionRepository;
+use App\Service\FileSystemService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityNotFoundException;
 use Exception;
@@ -25,7 +26,8 @@ class AddressImportGeojsonCommand extends Command
     public function __construct(
         private readonly VersionRepository $versionRepository,
         private readonly AddressRepository $addressRepository,
-        private readonly Connection $connection
+        private readonly Connection $connection,
+        private readonly FileSystemService $fileSystemService,
     ) {
         parent::__construct();
     }
@@ -35,7 +37,7 @@ class AddressImportGeojsonCommand extends Command
         $this
             ->addArgument('version-number', InputArgument::REQUIRED, 'The version we want to import under')
             ->addArgument('input-file', InputArgument::REQUIRED, 'The input file')
-            ->addOption('country', 'c', InputOption::VALUE_OPTIONAL, 'Force a country instead of taking it from the \'input-file\'', null);
+            ->addArgument('country', InputArgument::REQUIRED, 'The country the file belongs to');
     }
 
     /**
@@ -46,21 +48,13 @@ class AddressImportGeojsonCommand extends Command
     {
         $versionNumber = (int) $input->getArgument('version-number');
         $inputFile = $input->getArgument('input-file');
-        $country = $input->getOption('country');
-        if (null === $country) {
-            $country = Path::getFilenameWithoutExtension($inputFile);
-        }
+        $country = $input->getArgument('country');
 
         $version = $this->versionRepository->findByVersionNumberOrThrow($versionNumber);
 
-        $inputFilePath = Path::makeAbsolute(Path::canonicalize($inputFile), getcwd());
-        if (!file_exists($inputFilePath)) {
-            throw new FileNotFoundException(sprintf(
-                '\'input-file\' %s was not found: %s',
-                $inputFile,
-                $inputFilePath
-            ));
-        }
+        $filePath = $this->fileSystemService->getAbsoluteFilePath($inputFile);
+        $this->fileSystemService->fileExistsOrThrow($filePath);
+        $filePath = Path::makeAbsolute(Path::canonicalize($inputFile), getcwd());
 
         $address = $this->addressRepository->findOneBy(['country' => $country, 'version' => $version]);
         if ($address) {
@@ -71,7 +65,7 @@ class AddressImportGeojsonCommand extends Command
             ));
         }
 
-        $contents = file($inputFilePath);
+        $contents = file($filePath);
         $total = count($contents);
         $output->writeln("$total addresses to be imported");
 
@@ -113,6 +107,7 @@ RETURNING id;
             $addressStatement = $this->connection->prepare('
 INSERT INTO address(id, coordinate_id, number, street, unit, district, region, postcode, hash, external_id, country, city, version_id) 
 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT DO NOTHING
 RETURNING id;
 ');
 
